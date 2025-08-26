@@ -10,12 +10,20 @@ import java.nio.file.StandardCopyOption;
 import java.security.InvalidKeyException;
 import java.security.NoSuchAlgorithmException;
 
+import javax.crypto.KeyGenerator;
+
+import com.common.utils.SecurityUtils;
+
 import io.minio.BucketExistsArgs;
+import io.minio.DownloadObjectArgs;
+import io.minio.GetBucketTagsArgs;
 import io.minio.GetObjectArgs;
 import io.minio.MakeBucketArgs;
 import io.minio.MinioClient;
 import io.minio.PutObjectArgs;
+import io.minio.ServerSideEncryptionCustomerKey;
 import io.minio.errors.MinioException;
+import io.minio.messages.Tags;
 
 public class MinioTest {
 
@@ -54,12 +62,33 @@ public class MinioTest {
 			// -1).build());
 
 			minioClient.putObject(PutObjectArgs.builder().bucket(BUCKET_NAME).object("kid.jpg")
+					//.sse(SecurityUtils.getServerSideKey()).
 					.stream(new FileInputStream(tempFilePath.toFile()), Files.size(tempFilePath), -1).build());
 
 			try (InputStream stream = minioClient
 					.getObject(GetObjectArgs.builder().bucket(BUCKET_NAME).object("kid.jpg").build())) {
 				// Read the stream
 			}
+			   Tags tags =
+				          minioClient.getBucketTags(GetBucketTagsArgs.builder().bucket("my-bucketname").build());
+				      System.out.println("Bucket tags: " + tags.get());
+
+		      {
+		        KeyGenerator keyGen = KeyGenerator.getInstance("AES");
+		        keyGen.init(256);
+		        ServerSideEncryptionCustomerKey ssec =
+		            new ServerSideEncryptionCustomerKey(keyGen.generateKey());
+
+		        // Download SSE-C encrypted 'my-objectname' from 'my-bucketname' to 'my-filename'
+		        minioClient.downloadObject(
+		            DownloadObjectArgs.builder()
+		                .bucket("my-bucketname")
+		                .object("my-objectname")
+		                .filename("my-filename")
+		                .ssec(SecurityUtils.getServerSideKey()) // Replace with same SSE-C used at the time of upload.
+		                .build());
+		        System.out.println("my-objectname is successfully downloaded to my-filename");
+		      }
 			// Files.delete(tempFile);
 		} catch (MinioException e) {
 			System.out.println("Error occurred: " + e);
